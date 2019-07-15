@@ -37,6 +37,7 @@ for i = 1:length(model.rxns)
      end
 end
 model.rxns = cellstr(model.rxns);
+
 %add new Metabolites
 model = addMetabolite(model, 'phleth[e]', 'metName', 'Phenylethylene (extracellular)',...
     'metFormula', 'C8H8', 'Charge', 0); 
@@ -48,11 +49,11 @@ model = addMetabolite(model, 'phloxi_S2[c]', 'metName', '(S)-2-Phenyloxirone',..
     'metFormula', 'C8H8O', 'Charge', 0);
 %phenylacetaldehyde already in model as pacald (in all compartments)
 %phenylacetic acid already in model as pac[c]
-
 model = addMetabolite(model, 'hbcoa_3R[c]', 'metName', '(3R)-hydroxybutanoyl-CoA',...
     'metFormula', 'C25H38N7O18P3S', 'Charge', -4);
 model = addMetabolite(model, 'phb[c]', 'metName', '(3R)-hydroxybutanoate',...
     'metFormula', 'C4H7O3', 'Charge', -1);
+
 %add new sty reactions. 
 model = addReaction(model, 'EX_phleth(e)', 'reactionName', 'phenylethylene exchange',...
     'reactionFormula', 'pheleth[e] <=> ');
