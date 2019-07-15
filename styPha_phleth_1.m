@@ -1,0 +1,101 @@
+clear
+model = loadBiGGModel('iML1515');
+%update format to fit COBRA standard
+model.mets = string(model.mets);
+for i = 1:length(model.mets)
+    temp = model.mets(i);
+    if endsWith(temp,'c') == 1
+        temp = strcat(temp, '.');
+        final = strrep(temp, '_c.', '[c]');
+        model.mets(i) = final;
+    elseif endsWith(temp,'e') == 1
+        temp = strcat(temp, '.');
+        final = strrep(temp, '_e.', '[e]');
+        model.mets(i) = final;
+    elseif endsWith(temp, 'p') == 1
+        temp = strcat(temp, '.');
+        final = strrep(temp, '_p.', '[p]');
+        model.mets(i) = final;
+    end
+end
+model.mets = cellstr(model.mets);
+model.rxns = string(model.rxns);
+for i = 1:length(model.rxns)
+    temp = model.rxns(i);
+    if endsWith(temp,'_c') == 1
+        temp = strcat(temp, '.');
+        final = strrep(temp, '_c.', '(c)');
+        model.rxns(i) = final;
+    elseif endsWith(temp,'_e') == 1
+        temp = strcat(temp, '.');
+        final = strrep(temp, '_e.', '(e)');
+        model.rxns(i) = final;
+    elseif endsWith(temp, '_p') == 1
+        temp = strcat(temp, '.');
+        final = strrep(temp, '_p.', '(p)');
+        model.rxns(i) = final;
+     end
+end
+model.rxns = cellstr(model.rxns);
+%add new Metabolites
+model = addMetabolite(model, 'phleth[e]', 'metName', 'Phenylethylene (extracellular)',...
+    'metFormula', 'C8H8', 'Charge', 0); 
+model = addMetabolite(model, 'phleth[p]', 'metName', 'Phenylethylene (periplasmic)',...
+    'metFormula', 'C8H8', 'Charge', 0); 
+model = addMetabolite(model, 'phleth[c]', 'metName', 'Phenylethylene (cytoplasmic)',...
+    'metFormula', 'C8H8', 'Charge', 0); 
+model = addMetabolite(model, 'phloxi_S2[c]', 'metName', '(S)-2-Phenyloxirone',...
+    'metFormula', 'C8H8O', 'Charge', 0);
+%phenylacetaldehyde already in model as pacald (in all compartments)
+%phenylacetic acid already in model as pac[c]
+
+model = addMetabolite(model, 'hbcoa_3R[c]', 'metName', '(3R)-hydroxybutanoyl-CoA',...
+    'metFormula', 'C25H38N7O18P3S', 'Charge', -4);
+model = addMetabolite(model, 'phb[c]', 'metName', '(3R)-hydroxybutanoate',...
+    'metFormula', 'C4H7O3', 'Charge', -1);
+%add new sty reactions. 
+model = addReaction(model, 'EX_phleth(e)', 'reactionName', 'phenylethylene exchange',...
+    'reactionFormula', 'pheleth[e] <=> ');
+model = addReaction(model, 'STYtpp', 'reactionName', 'phenylethylene transport via porin (extracellular)',...
+    'reactionFormula', 'pheleth[e] <=> pheleth[p]');
+model = addReaction(model, 'STYE', 'reactionName', 'phenylethylene transport via active transport (periplasmic)',...
+    'reactionFormula', 'pheleth[p] + atp[c] + h2o[c] -> pheleth[c] + adp[c] + pi[c] + h[c]');
+model = addReaction(model, 'STYAB', 'reactionName', 'phenylethylene oxidoreductase',...
+    'reactionFormula', 'phleth[c] + fadh2[c] + o2[c] <=> fad[c] + h2o[c] + phloxi_S2[c]');
+model = addReaction(model, 'STYC', 'reactionName', '(S)-2-Phenyloxirone isomerase',...
+    'reactionFormula', 'phloxi_S2[c] <=> pacald[c]');
+model = addReaction(model, 'STYD', 'reactionName', 'Phenylacetaldehyde oxidoreductase',...
+    'reactionFormula', 'pacald[c] + nad[c] + h2o[c] <=> pac[c] + nadh[c] + h[c]');
+
+%add new PHB reactions, phaA is already present as ACACT1r
+model = addReaction(model, 'PHABr', 'reactionName', 'acetoacetyl-CoA reductase',...
+    'reactionFormula', 'aacoa[c] + h[c] + nadph[c] <=> nadp[c] + hbcoa_3R[c]');
+model = addReaction(model, 'PHACr', 'reactionName', 'polyhydroxyalkanoate synthase subunit PhaC',...
+    'reactionFormula', 'hbcoa_3R[c] <=> phb[c] + coa[c]');
+%create a demand reaction for phb output
+model = addDemandReaction(model, {'phb[c]'});
+%associate new genes to reactions
+model = changeGeneAssociation(model, 'ACACT1r', 'PhaA');
+model = changeGeneAssociation(model, 'PHABr', 'PhaB');
+model = changeGeneAssociation(model, 'PHACr', 'PhaC');
+%change objective to both phb and biomass reactions (doesn't work)
+model = changeObjective(model, {'DM_phb[c]'}); %;'BIOMASS_Ec_iML1515_core_75p37M'});
+%create solution using glucose as main carbon source
+sGlu = optimizeCbModel(model, 'max');
+%change medium carbon source to phenylacetaldehyde
+model = changeRxnBounds(model, 'EX_phleth(e)', -10, 'l');
+model = changeRxnBounds(model, 'EX_glc__D(e)', 0, 'l'); 
+%create solution using phenylacetaldehyde
+sPac = optimizeCbModel(model, 'max');
+%put two flux vectors in a matrix
+fluxMatrix = [sGlu.x, sPac.x];  
+%reactions with different fluxes
+rxnDiff = abs(fluxMatrix(:, 1) - fluxMatrix(:, 2)) > 1e-6;
+numDiff = 0;
+for i = 1:length(rxnDiff) % find number of reactions that are different
+    if rxnDiff(i) == 1
+        numDiff = numDiff + 1;
+    end
+end
+surfNet(model, model.rxns(rxnDiff), [], fluxMatrix, [], 0)
+outmodel = writeCbModel(model, 'xls', 'core_model.xls');
