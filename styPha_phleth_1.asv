@@ -45,7 +45,7 @@ model = addMetabolite(model, 'phleth[p]', 'metName', 'Phenylethylene (periplasmi
     'metFormula', 'C8H8', 'Charge', 0); 
 model = addMetabolite(model, 'phleth[c]', 'metName', 'Phenylethylene (cytoplasmic)',...
     'metFormula', 'C8H8', 'Charge', 0); 
-model = addMetabolite(model, 'phloxi_S2[c]', 'metName', '(2S)-2-Phenyloxirone',...
+model = addMetabolite(model, 'phloxi_S2[c]', 'metName', '(S)-2-Phenyloxirone',...
     'metFormula', 'C8H8O', 'Charge', 0);
 %phenylacetaldehyde already in model as pacald (in all compartments)
 %phenylacetic acid already in model as pac[c]
@@ -54,39 +54,37 @@ model = addMetabolite(model, 'hbcoa_3R[c]', 'metName', '(3R)-hydroxybutanoyl-CoA
 model = addMetabolite(model, 'phb[c]', 'metName', '(3R)-hydroxybutanoate',...
     'metFormula', 'C4H7O3', 'Charge', -1);
 
-%add new sty reactions. STYDr is already present as ALDD19xr
+%add new sty reactions. 
 model = addReaction(model, 'EX_phleth(e)', 'reactionName', 'phenylethylene exchange',...
-    'reactionFormula', 'phleth[e] -> ');
+    'reactionFormula', 'phleth[e] <=> ');
 model = addReaction(model, 'STYtpp', 'reactionName', 'phenylethylene transport via porin (extracellular)',...
     'reactionFormula', 'phleth[e] <=> phleth[p]');
 model = addReaction(model, 'STYEr', 'reactionName', 'phenylethylene transport via active transport (periplasmic)',...
     'reactionFormula', 'phleth[p] + atp[c] + h2o[c] -> phleth[c] + adp[c] + pi[c] + h[c]');
 model = addReaction(model, 'STYABr', 'reactionName', 'phenylethylene oxidoreductase',...
-    'reactionFormula', 'phleth[c] + fadh2[c] + o2[c] <=> h[c] + fad[c] + h2o[c] + phloxi_S2[c]');
+    'reactionFormula', 'phleth[c] + fadh2[c] + o2[c] <=> fad[c] + h2o[c] + phloxi_S2[c]');
 model = addReaction(model, 'STYCr', 'reactionName', '(S)-2-Phenyloxirone isomerase',...
     'reactionFormula', 'phloxi_S2[c] <=> pacald[c]');
-%model = addReaction(model, 'STYDr', 'reactionName', 'Phenylacetaldehyde oxidoreductase',...
- % 'reactionFormula', 'pacald[c] + nad[c] + h2o[c] <=> pac[c] + nadh[c] + 2 h[c]');
+model = addReaction(model, 'STYDr', 'reactionName', 'Phenylacetaldehyde oxidoreductase',...
+    'reactionFormula', 'pacald[c] + nad[c] + h2o[c] <=> pac[c] + nadh[c] + h[c]');
+
 %add new PHB reactions, phaA is already present as ACACT1r
 model = addReaction(model, 'PHABr', 'reactionName', 'acetoacetyl-CoA reductase',...
     'reactionFormula', 'aacoa[c] + h[c] + nadph[c] <=> nadp[c] + hbcoa_3R[c]');
 model = addReaction(model, 'PHACr', 'reactionName', 'polyhydroxyalkanoate synthase subunit PhaC',...
     'reactionFormula', 'hbcoa_3R[c] <=> phb[c] + coa[c]');
-
 %create a demand reaction for phb output
 model = addDemandReaction(model, {'phb[c]'});
-
 %associate new genes to reactions
 model = changeGeneAssociation(model, 'STYEr', 'StyE');
-model = changeGeneAssociation(model, 'STYABr', {'StyA', 'StyB'});
-model = changeGeneAssociation(model, 'STYCr', 'StyC');
-model = changeGeneAssociation(model, 'ALDD19xr', 'StyD');
+model = changeGeneAssociation(model, 'STYABr', {'StyA');
+model = changeGeneAssociation(model, 'PHACr', 'PhaC');
+model = changeGeneAssociation(model, 'PHACr', 'PhaC');
 model = changeGeneAssociation(model, 'ACACT1r', 'PhaA');
 model = changeGeneAssociation(model, 'PHABr', 'PhaB');
 model = changeGeneAssociation(model, 'PHACr', 'PhaC');
-
 %change objective to both phb and biomass reactions (doesn't work)
-model = changeObjective(model,'DM_phb[c]'); %{'BIOMASS_Ec_iML1515_core_75p37M'});
+model = changeObjective(model, {'DM_phb[c]'}); %;'BIOMASS_Ec_iML1515_core_75p37M'});
 %create solution using glucose as main carbon source
 sGlu = optimizeCbModel(model, 'max');
 %change medium carbon source to phenylacetaldehyde
@@ -94,7 +92,6 @@ model = changeRxnBounds(model, 'EX_phleth(e)', -10, 'l');
 model = changeRxnBounds(model, 'EX_glc__D(e)', 0, 'l'); 
 %create solution using phenylacetaldehyde
 sPac = optimizeCbModel(model, 'max');
-
 %put two flux vectors in a matrix
 fluxMatrix = [sGlu.x, sPac.x];  
 %reactions with different fluxes
