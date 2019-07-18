@@ -105,5 +105,28 @@ for i = 1:length(rxnDiff) % find number of reactions that are different
         numDiff = numDiff + 1;
     end
 end
-surfNet(model, model.rxns(rxnDiff), [], fluxMatrix, [], 0)
+%surfNet(model, model.rxns(rxnDiff), [], fluxMatrix, [], 0)
 outmodel = writeCbModel(model, 'xls', 'core_model.xls');
+sbmlmodel = writeCbModel(model, 'format', 'sbml', 'fileName', 'styPha_phleth_1');
+
+mediumVar = (-100:-1);
+objectiveVector = zeros(100,1);
+for i = 1:length(mediumVar)
+    model = changeRxnBounds(model, 'EX_phleth(e)', mediumVar(i), 'l');
+    s = optimizeCbModel(model, 'max');
+    objectiveVector(i) = s.obj;
+end
+
+model = changeRxnBounds(model, 'EX_phleth(e)', 0, 'l');
+
+otherVector = zeros(100,1);
+for i = 1:length(mediumVar)
+    model = changeRxnBounds(model, 'EX_glc__D(e)', mediumVar(i), 'l');
+    l = optimizeCbModel(model, 'max');
+    otherVector(i) = l.obj;
+end
+
+
+plot(mediumVar, objectiveVector, mediumVar, otherVector)
+mPhl = (objectiveVector(100)-objectiveVector(1))/(mediumVar(100)-mediumVar(1));
+mGlu = (otherVector(100)-otherVector(1))/(mediumVar(100)-mediumVar(1));
